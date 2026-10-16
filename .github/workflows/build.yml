@@ -27,8 +27,11 @@ jobs:
           set -e
           PKG=com.hozinking.apisoofer
           ANDROID_JAR=$ANDROID_HOME/platforms/android-34/android.jar
-          AAPT2=$ANDROID_HOME/build-tools/34.0.0/aapt2
-          D8=$ANDROID_HOME/build-tools/34.0.0/d8
+          BT=$ANDROID_HOME/build-tools/34.0.0
+          AAPT2=$BT/aapt2
+          D8=$BT/d8
+          ZIPALIGN=$BT/zipalign
+          APKSIGNER=$BT/apksigner
           mkdir -p build/gen build/classes build/dex
 
           # Compile resources
@@ -58,14 +61,14 @@ jobs:
           (cd build/dex && zip -q ../base.apk classes.dex)
           mkdir -p build/apk/assets && cp app/src/main/assets/xposed_init build/apk/assets/
           (cd build/apk && zip -q -r ../base.apk assets)
-          zipalign -f 4 build/base.apk build/aligned.apk || cp build/base.apk build/aligned.apk
+          $ZIPALIGN -f 4 build/base.apk build/aligned.apk || cp build/base.apk build/aligned.apk
 
           # Sign with debug key
           keytool -genkeypair -keystore build/debug.keystore -alias androiddebugkey \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
-          apksigner sign --ks build/debug.keystore --ks-pass:android \
+          $APKSIGNER sign --ks build/debug.keystore --ks-pass:android \
             --key-pass:android --out HozinApiSpoofer.apk build/aligned.apk
           ls -la HozinApiSpoofer.apk
 
