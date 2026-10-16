@@ -1,0 +1,76 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK (aapt2 + javac + d8)
+        run: |
+          set -e
+          PKG=com.hozinking.apisoofer
+          ANDROID_JAR=$ANDROID_HOME/platforms/android-34/android.jar
+          AAPT2=$ANDROID_HOME/build-tools/34.0.0/aapt2
+          D8=$ANDROID_HOME/build-tools/34.0.0/d8
+          mkdir -p build/gen build/classes build/dex
+
+          # Compile resources
+          $AAPT2 compile --dir app/src/main/assets -o build/assets.zip || true
+          $AAPT2 link -o build/unsigned.apk \
+            -I $ANDROID_JAR \
+            --manifest app/src/main/AndroidManifest.xml \
+            --java build/gen \
+            -A app/src/main/assets || \
+          $AAPT2 link -o build/unsigned.apk \
+            -I $ANDROID_JAR \
+            --manifest app/src/main/AndroidManifest.xml \
+            --java build/gen
+
+          # Compile Java (Xposed API is compile-only)
+          find app/src/main/java build/gen -name "*.java" > build/sources.txt
+          javac -encoding UTF-8 -proc:none -source 8 -target 8 \
+            -cp libs/xposed-api-82.jar:$ANDROID_JAR \
+            -d build/classes @build/sources.txt
+
+          # Dex
+          $D8 --lib $ANDROID_JAR --min-api 21 \
+            --output build/dex $(find build/classes -name "*.class")
+
+          # Package
+          cp build/unsigned.apk build/base.apk
+          cd build/dex && zip -q ../base.apk classes.dex && cd ..
+          mkdir -p apk/assets && cp app/src/main/assets/xposed_init apk/assets/
+          cd apk && zip -q -r ../base.apk assets && cd ..
+          zipalign -f 4 build/base.apk build/aligned.apk || cp build/base.apk build/aligned.apk
+
+          # Sign with debug key
+          keytool -genkeypair -keystore build/debug.keystore -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
+          apksigner sign --ks build/debug.keystore --ks-pass:android \
+            --key-pass:android --out HozinApiSpoofer.apk build/aligned.apk
+          ls -la HozinApiSpoofer.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HozinApiSpoofer
+          path: HozinApiSpoofer.apk
