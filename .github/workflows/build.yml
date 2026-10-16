@@ -68,8 +68,8 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
-          $APKSIGNER sign --ks build/debug.keystore --ks-pass:android \
-            --key-pass:android --out HozinApiSpoofer.apk build/aligned.apk
+          $APKSIGNER sign --ks build/debug.keystore --ks-pass pass:android \
+            --key-pass pass:android --out HozinApiSpoofer.apk build/aligned.apk
           ls -la HozinApiSpoofer.apk
 
       - name: Upload APK
