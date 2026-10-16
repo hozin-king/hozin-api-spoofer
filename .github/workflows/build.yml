@@ -55,9 +55,9 @@ jobs:
 
           # Package
           cp build/unsigned.apk build/base.apk
-          cd build/dex && zip -q ../base.apk classes.dex && cd ..
-          mkdir -p apk/assets && cp app/src/main/assets/xposed_init apk/assets/
-          cd apk && zip -q -r ../base.apk assets && cd ..
+          (cd build/dex && zip -q ../base.apk classes.dex)
+          mkdir -p build/apk/assets && cp app/src/main/assets/xposed_init build/apk/assets/
+          (cd build/apk && zip -q -r ../base.apk assets)
           zipalign -f 4 build/base.apk build/aligned.apk || cp build/base.apk build/aligned.apk
 
           # Sign with debug key
